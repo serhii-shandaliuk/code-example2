@@ -1,0 +1,12 @@
+slp_school.slp_school_type.*:
+  type: config_entity
+  label: 'SLP school type config'
+  mapping:
+    id:
+      type: string
+      label: 'ID'
+    label:
+      type: label
+      label: 'Label'
+    uuid:
+      type: string

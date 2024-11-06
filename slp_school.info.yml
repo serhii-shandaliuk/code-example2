@@ -1,0 +1,7 @@
+name: SLP school
+type: module
+description: SLP school functionality.
+core_version_requirement: ^9.2 || ^10
+package: SLP
+dependencies:
+  - config_entity_cloner:config_entity_cloner

@@ -1,0 +1,23 @@
+entity.slp_school.collection:
+  title: 'SLP schools'
+  route_name: entity.slp_school.collection
+  base_route: system.admin_content
+  weight: 10
+entity.slp_school_type.edit_form:
+  title: 'Edit'
+  route_name: entity.slp_school_type.edit_form
+  base_route: entity.slp_school_type.edit_form
+entity.slp_school_type.collection:
+  title: 'List'
+  route_name: entity.slp_school_type.collection
+  base_route: entity.slp_school_type.collection
+
+entity.slp_group.settings:
+  title: 'Settings'
+  route_name: entity.slp_group.settings
+  base_route: entity.slp_group.settings
+entity.slp_group.collection:
+  title: 'SLP groups'
+  route_name: entity.slp_group.collection
+  base_route: system.admin_content
+  weight: 10

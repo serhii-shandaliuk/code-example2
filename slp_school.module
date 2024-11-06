@@ -1,0 +1,1310 @@
+<?php
+
+/**
+ * File slp_school.module.
+ */
+
+use Drupal\commerce_product\Entity\Product;
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Url;
+use Drupal\node\Entity\Node;
+use Drupal\node\NodeInterface;
+use Drupal\paragraphs\Entity\Paragraph;
+use Drupal\taxonomy\Entity\Term;
+use Drupal\taxonomy\TermInterface;
+use Drupal\user\Entity\User;
+use Drupal\views\Plugin\views\query\QueryPluginBase;
+use Drupal\views\ViewExecutable;
+use GuzzleHttp\Exception\RequestException;
+
+/**
+ * Implements hook_cron().
+ */
+function slp_school_cron(): void {
+  $storage = Drupal::service('entity_type.manager')->getStorage('user');
+  $user_query = $storage->getQuery();
+  $user_query->accessCheck();
+  $user_query->condition('field_due_date.value', date('Y-m-d'), '<');
+  $group = $user_query
+    ->orConditionGroup()
+    ->condition('field_due_date.value', date('Y-m-d'), '<')
+    ->exists('field_due_date.value');
+  $user_query->condition($group);
+
+  $group = $user_query
+    ->orConditionGroup()
+    ->condition('field_expired.value', FALSE)
+    ->notExists('field_expired.value');
+  $user_query->condition($group);
+  $expired_users = $user_query->execute();
+  if (!empty($expired_users)) {
+    foreach ($expired_users as $expired_user) {
+      Drupal::queue('revoke_expired_users_access')->createItem($expired_user);
+    }
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function slp_school_theme(): array {
+  return [
+    'slp_lesson_vocabulary' => [
+      'variables' => [
+        'words' => [],
+      ],
+    ],
+    'slp_payment' => [
+      'variables' => [
+        'text' => NULL,
+        'class' => NULL,
+        'payment_link' => NULL,
+      ],
+    ],
+    'slp_payment_popup' => [
+      'variables' => [
+        'select_form' => NULL,
+        'variation' => NULL,
+      ],
+    ],
+  ];
+}
+
+/**
+ * Implements hook_entity_extra_field_info().
+ */
+function slp_school_entity_extra_field_info(): array {
+  $extra = [];
+  $extra['user']['user']['display']['slp_add_student'] = [
+    'label' => t('Add student'),
+    'description' => t('Add student'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_add_teacher'] = [
+    'label' => t('Add teacher'),
+    'description' => t('Add teacher'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_add_course'] = [
+    'label' => t('Add course'),
+    'description' => t('Add course'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_add_lesson'] = [
+    'label' => t('Add lesson'),
+    'description' => t('Add lesson'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_add_lesson_access_for_group'] = [
+    'label' => t('Manage lessons access for selected groups'),
+    'description' => t('Manage lessons access for selected groups'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_add_course_access_for_group'] = [
+    'label' => t('Manage courses access for selected groups'),
+    'description' => t('Manage courses access for selected groups'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_add_group'] = [
+    'label' => t('Add group'),
+    'description' => t('Add group'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_add_event'] = [
+    'label' => t('Add event'),
+    'description' => t('Add event'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_add_lesson_entity'] = [
+    'label' => t('Add lesson entity'),
+    'description' => t('Add lesson entity'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_add_entity_course'] = [
+    'label' => t('Add entity course'),
+    'description' => t('Add entity course'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_lessons_chart'] = [
+    'label' => t('Lessons chart'),
+    'description' => t('Lessons chart'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['node']['lesson']['display']['slp_lessons_vocabulary'] = [
+    'label' => t('Lesson vocabulary'),
+    'description' => t('Lesson vocabulary'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['user']['user']['display']['slp_word_to_vocabulary'] = [
+    'label' => t('Add word to vocabulary'),
+    'description' => t('Add word to vocabulary'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['paragraph']['plan_item']['display']['slp_add_homework'] = [
+    'label' => t('Add homework'),
+    'description' => t('Add homework'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  $extra['node']['event']['display']['slp_lesson_start'] = [
+    'label' => t('Start the lesson button'),
+    'description' => t('Start the lesson button'),
+    'weight' => 100,
+    'visible' => FALSE,
+  ];
+
+  return $extra;
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_view().
+ */
+function slp_school_user_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display): void {
+  if ($display->getComponent('slp_add_student')) {
+    _slp_school_build_popup_link($build, 'student');
+    $component = $display->getComponent('slp_add_student');
+    if (isset($component['weight'])) {
+      $build['slp_add_student']['#weight'] = $component['weight'];
+    }
+  }
+  if ($display->getComponent('slp_add_teacher')) {
+    _slp_school_build_popup_link($build, 'teacher');
+    $component = $display->getComponent('slp_add_teacher');
+    if (isset($component['weight'])) {
+      $build['slp_add_teacher_or_author']['#weight'] = $component['weight'];
+    }
+  }
+  if ($display->getComponent('slp_add_group')) {
+    _slp_school_build_popup_link($build, 'group');
+    $component = $display->getComponent('slp_add_group');
+    if (isset($component['weight'])) {
+      $build['slp_add_group']['#weight'] = $component['weight'];
+    }
+  }
+
+  if ($display->getComponent('slp_add_event')) {
+    _slp_school_build_popup_link($build, 'event');
+    $component = $display->getComponent('slp_add_event');
+    if (isset($component['weight'])) {
+      $build['slp_add_event']['#weight'] = $component['weight'];
+    }
+  }
+  if ($display->getComponent('slp_add_course')) {
+    _slp_school_build_popup_link($build, 'course');
+    $component = $display->getComponent('slp_add_course');
+    if (isset($component['weight'])) {
+      $build['slp_add_course_access']['#weight'] = $component['weight'];
+    }
+  }
+  if ($display->getComponent('slp_add_lesson')) {
+    _slp_school_build_popup_link($build, 'lesson');
+    $component = $display->getComponent('slp_add_lesson');
+    if (isset($component['weight'])) {
+      $build['slp_add_lesson_access']['#weight'] = $component['weight'];
+    }
+  }
+
+  if ($display->getComponent('slp_add_lesson_access_for_group')) {
+    _slp_school_build_popup_link($build, 'lessons for group', 'slp_school.add_lesson_access_for_group');
+    $component = $display->getComponent('slp_add_lesson_access_for_group');
+    if (isset($component['weight'])) {
+      $build['slp_add_lesson_access']['#weight'] = $component['weight'];
+    }
+  }
+
+  if ($display->getComponent('slp_add_course_access_for_group')) {
+    _slp_school_build_popup_link($build, 'courses for group', 'slp_school.add_course_access_for_group');
+    $component = $display->getComponent('slp_add_course_access_for_group');
+    if (isset($component['weight'])) {
+      $build['slp_add_course_access']['#weight'] = $component['weight'];
+    }
+  }
+
+  if ($display->getComponent('slp_add_lesson_entity')) {
+    _slp_school_build_popup_link($build, 'lessons entitie', 'node.add', ['node_type' => 'lesson'], FALSE);
+    $component = $display->getComponent('slp_add_lesson_entity');
+    if (isset($component['weight'])) {
+      $build['slp_add_lesson_entity']['#weight'] = $component['weight'];
+    }
+  }
+  if ($display->getComponent('slp_word_to_vocabulary')) {
+    $id = Drupal::currentUser()->id();
+    $vocabulary = 'vocabulary_' . $id;
+    if ($id == 1) {
+      $vocabulary = 'vocabulary';
+    }
+    $properties = ['taxonomy_vocabulary' => $vocabulary];
+    _slp_school_build_popup_link($build, 'word', 'slp_school.add_vocabulary', $properties);
+    $component = $display->getComponent('slp_word_to_vocabulary');
+    if (isset($component['weight'])) {
+      $build['slp_word_to_vocabulary']['#weight'] = $component['weight'];
+    }
+  }
+  if ($display->getComponent('slp_add_entity_course')) {
+    $entity = \Drupal::routeMatch()->getParameter('entity');
+    $options = [];
+    if ($entity instanceof Paragraph) {
+      if ($entity->getParentEntity()->getEntityTypeId() === 'paragraph') {
+        $entity = $entity->getParentEntity();
+      }
+      $url = $entity->getParentEntity()?->toUrl()?->toString() . '#' . $entity->uuid();
+      $options = ['query' => ['destination' => $url]];
+    }
+    _slp_school_build_popup_link($build, 'entity course', 'entity.commerce_product.add_form', ['commerce_product_type' => 'default'], FALSE, $options);
+    $component = $display->getComponent('slp_add_entity_course');
+    if (isset($component['weight'])) {
+      $build['slp_add_entity_course']['#weight'] = $component['weight'];
+    }
+  }
+  if ($display->getComponent('slp_lessons_chart')) {
+    $uid = $entity->id();
+    $role = $entity->get('field_school_role')->value;
+    if (!$role || $role === 'student') {
+      $lessons = $entity->get('field_lessons')->getValue();
+      $output = _slp_school_build_lessons_chart_data($lessons, $uid);
+      $build['slp_lessons_chart'] = [];
+      if (!empty($output['data'])) {
+        $build['slp_lessons_chart'][] = _slp_school_get_chart(
+          $output['labels'],
+          $output['data'],
+          t('Your lessons'),
+          t('Score', [], ['context' => 'progress'])
+        );
+      }
+
+      $courses = $entity->get('field_courses')->getValue();
+      if ($courses) {
+        $node_storage = \Drupal::entityTypeManager()->getStorage('node');
+        $courses = array_column($courses, 'target_id');
+        $courses = array_unique($courses);
+        foreach ($courses as $course) {
+          $properties = ['field_course' => $course];
+          $lessons = $node_storage->loadByProperties($properties);
+          if (empty($lessons)) {
+            continue;
+          }
+
+          $course_entity = Product::load($course);
+          $output = _slp_school_build_lessons_chart_data($lessons, $uid);
+          if (empty($output['data'])) {
+            continue;
+          }
+
+          $title = t('By course: @course', ['@course' => $course_entity->getTitle()]);
+          $build['slp_lessons_chart'][] = _slp_school_get_chart(
+            $output['labels'],
+            $output['data'],
+            $title,
+            t('Score', [], ['context' => 'progress'])
+          );
+        }
+      }
+    }
+    elseif ($role === 'teacher' || $role === 'author') {
+      $build['slp_lessons_chart'][] = [
+        '#type' => 'view',
+        '#name' => 'rating',
+        '#display_id' => 'teacher_detailed',
+        '#arguments' => [$entity->id()],
+        '#embed' => TRUE,
+      ];
+
+    }
+    elseif ($role === 'director') {
+      $build['slp_lessons_chart'][] = [
+        '#type' => 'view',
+        '#name' => 'rating',
+        '#display_id' => 'teachers_rating',
+        '#embed' => TRUE,
+      ];
+    }
+
+    if (empty($build['slp_lessons_chart'])) {
+      $no_results = '<span class="no-results"><img src="/themes/custom/slp/images/no_results.png" alt="No results">';
+      $no_results .=  t('No results found.') . '</span>';
+      $build['slp_lessons_chart'] = [
+        '#type' => 'markup',
+        '#markup' => $no_results,
+      ];
+    }
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_view().
+ */
+function slp_school_node_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display): void {
+  if ($display->getComponent('slp_lessons_vocabulary')) {
+    unset($build['title']);
+    $paragraphs = $entity->get('field_paragraphs')->getValue();
+    $words = $words_output = [];
+    if ($paragraphs) {
+      foreach ($paragraphs as $paragraph_id) {
+        $paragraph = Paragraph::load($paragraph_id['target_id']);
+        if (!$paragraph) {
+          continue;
+        }
+
+        $interactive = $paragraph->get('field_interactive')->getValue();
+        if (!$interactive) {
+          continue;
+        }
+
+        foreach ($interactive as $item) {
+          $interactive_item = Paragraph::load($item['target_id']);
+          if (!$interactive_item) {
+            continue;
+          }
+
+          if ($interactive_item->getType() !== 'word_list') {
+            continue;
+          }
+
+          $tmp_words = $interactive_item->get('field_word_list')->getValue();
+          $tmp_words = array_column($tmp_words, 'target_id');
+          $words += $tmp_words;
+        }
+      }
+
+      if ($words) {
+        $words = array_unique($words);
+        $view_builder = Drupal::entityTypeManager()->getViewBuilder('taxonomy_term');
+        foreach ($words as $word) {
+          $term = Term::load($word);
+          $words_output[] = $view_builder->view($term, 'big');
+        }
+        $build['slp_lesson_vocabulary'] = [
+          '#theme' => 'slp_lesson_vocabulary',
+          '#words' => $words_output,
+          '#attached' => [
+            'library' => ['slp_interactive/slp_interactive'],
+          ],
+        ];
+      }
+      else {
+        $build['slp_lesson_vocabulary'] = [
+          '#markup' => t('This lesson does not have any vocabulary.'),
+          '#type' => 'markup',
+        ];
+      }
+    }
+  }
+  if ($display->getComponent('slp_lesson_start')) {
+    $lesson = $entity->get('field_lesson')->entity;
+    if ($lesson) {
+      $id = Drupal::currentUser()->id();
+      $load_user_id = $entity->get('field_teacher')->target_id;
+      $title = t('Start the lesson');
+      if ($load_user_id !== $id) {
+        $title = t('Join the lesson');
+      }
+      $build['slp_lesson_start'] = [
+        '#type' => 'link',
+        '#title' => $title,
+        '#url' => $lesson->toUrl(),
+        '#attributes' => [
+          'class' => ['btn btn-md'],
+        ],
+      ];
+    }
+  }
+}
+
+/**
+ * Returns data for char from the lesson.
+ *
+ * @param $lessons
+ *   Lessons array.
+ * @param $uid
+ *   User id.
+ *
+ * @return array[]
+ *   Of data for chart.
+ */
+function _slp_school_build_lessons_chart_data($lessons, $uid): array {
+  $labels = $data = [];
+  if ($lessons) {
+    $interactive_manager = Drupal::service('slp_interactive.interactive_manager');
+    foreach ($lessons as $lesson) {
+      if ($lesson instanceof NodeInterface) {
+        $entity = $lesson;
+      }
+      else {
+        $entity = Node::load($lesson['target_id']);
+      }
+
+      if (!$entity) {
+        continue;
+      }
+
+      $id = $entity->getCreatedTime();
+      if ($interactive_manager->calculateProgress($entity, $uid) > 0) {
+        $data[$id] = $interactive_manager->calculateProgress($entity, $uid);
+        $labels[$id] = $entity->getTitle();
+      }
+    }
+  }
+
+  if (count($data) === 0) {
+    return [];
+  }
+
+  $max = max($data);
+  if ($max === 0) {
+    return [];
+  }
+
+  return ['labels' => $labels, 'data' => $data];
+}
+
+/**
+ * Builds popup link.
+ * @param $build
+ *   Build array.
+ * @param $name
+ *   Name of link.
+ */
+function _slp_school_build_popup_link(&$build, $name, $route = '', $params = [], $attributes = TRUE, $options = []): void {
+  $user = Drupal::currentUser();
+  $renderer = Drupal::service('renderer');
+  $renderer->addCacheableDependency($build, $user);
+  $permission = sprintf('access add %ss', $name);
+  if (!$user->hasPermission($permission)) {
+    return;
+  }
+
+  if (!$route) {
+    $route = 'slp_school.add_' . $name;
+  }
+
+  if ($route === 'slp_school.add_vocabulary') {
+    $name = 'word to vocabulary';
+  }
+  elseif ($route === 'node.add') {
+    $name = 'lesson';
+  }
+  elseif ($route === 'entity.commerce_product.add_form') {
+    $name = 'course';
+  }
+  elseif ($name === 'course') {
+    $name = 'course access';
+  }
+  elseif ($name === 'lesson') {
+    $name = 'lesson access';
+  }
+  elseif ($name === 'teacher') {
+    $name = 'teacher or author';
+  }
+  elseif ($route === 'slp_school.add_lesson_access_for_group') {
+    $name = 'lesson access';
+  }
+  elseif ($route === 'slp_school.add_course_access_for_group') {
+    $name = 'course access';
+  }
+
+  $title = t('Add @name', ['@name' => t($name)]);
+  if ($route === 'slp_lessons_library.generate_lesson') {
+    $title = t('Generate the lesson with AI');
+  }
+  if ($route === 'view.lessons_library.page_1') {
+    $title = t('Select existing lessons');
+    $name = 'select-existing-lessons';
+  }
+
+  $url = Url::fromRoute($route, $params, $options);
+  if (!$url->access()) {
+    return;
+  }
+
+  $build['slp_add_' . str_replace([' ', '-'], '_', $name)] = [
+    '#type' => 'link',
+    '#title' => $title,
+    '#url' => $url,
+
+  ];
+  if ($attributes) {
+    $build['slp_add_' . str_replace([' ', '-'], '_', $name)]['#attributes'] = [
+      'class' => ['use-ajax btn btn-primary btn-md ' . $name],
+      'data-dialog-type' => 'modal',
+      'data-progress-type' => 'fullscreen',
+    ];
+  }
+  else {
+    $build['slp_add_' . str_replace([' ', '-'], '_', $name)]['#attributes'] = [
+      'class' => ['btn btn-primary btn-md'],
+      'data-progress-type' => 'fullscreen',
+    ];
+  }
+
+  $build['#attached']['library'][] = 'core/jquery.form';
+  $build['#attached']['library'][] = 'core/drupal.dialog.ajax';
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_view().
+ */
+function slp_school_paragraph_view(array &$build, EntityInterface $entity, EntityViewDisplayInterface $display): void {
+  if ($display->getComponent('slp_add_homework')) {
+    $parameters = ['node' => $entity->getParentEntity()->id(), 'paragraph' => $entity->id()];
+    _slp_school_build_popup_link($build, 'homework', '', $parameters);
+    $build['slp_add_homework']['#prefix'] = '<div class="homework-wrapper">';
+    $build['slp_add_homework']['#suffix'] = '</div>';
+  }
+
+  if ($entity->bundle() !== 'current_user_data') {
+    return;
+  }
+
+  $user = Drupal::currentUser();
+  $renderer = Drupal::service('renderer');
+  $renderer->addCacheableDependency($build, $user);
+  if ($user->isAnonymous()) {
+    return;
+  }
+
+  $storage = Drupal::entityTypeManager()->getStorage('user');
+  $user = $storage->load($user->id());
+  $viewBuilder = Drupal::entityTypeManager()->getViewBuilder('user');
+  $view_mode = $entity->get('field_view_mode')->target_id ?? 'default';
+  $explode = explode('.', $view_mode);
+  $view_mode = end($explode);
+  $build['user_data'] = $viewBuilder->view($user, $view_mode);
+}
+
+/**
+ * @file
+ * The module file.
+ */
+
+/**
+ * Implements hook_views_data().
+ */
+function slp_school_views_data(): array {
+  $data['views']['table']['group'] = t('Vocabulary link');
+  $data['views']['table']['join'] = [
+    // #global is a special flag which allows a table to appear all the time.
+    '#global' => [],
+  ];
+
+  $data['views']['user_lessons_link'] = [
+    'title' => t('User statistic link'),
+    'help' => t('The link to show user statistic in the popup.'),
+    'field' => [
+      'id' => 'user_lessons_link',
+    ],
+  ];
+
+  $data['views']['user_statistic_link'] = [
+    'title' => t('Statistic link'),
+    'help' => t('The link to show user statistic in the popup.'),
+    'field' => [
+      'id' => 'user_statistic_link',
+    ],
+  ];
+
+  $data['views']['manage_student'] = [
+    'title' => t('Manage student links'),
+    'help' => t('Manage student links'),
+    'field' => [
+      'id' => 'manage_student',
+    ],
+  ];
+
+  $data['views']['manage_teacher'] = [
+    'title' => t('Manage teacher links'),
+    'help' => t('Manage teacher links'),
+    'field' => [
+      'id' => 'manage_teacher',
+    ],
+  ];
+
+  $data['views']['manage_group'] = [
+    'title' => t('Manage group links'),
+    'help' => t('Manage group links'),
+    'field' => [
+      'id' => 'manage_group',
+    ],
+  ];
+
+  $data['views']['lesson_vocabulary_link'] = [
+    'title' => t("Lesson's vocabulary link"),
+    'help' => t("Lesson's vocabulary link to show lesson vocabulary in popup."),
+    'field' => [
+      'id' => 'lesson_vocabulary_link',
+    ],
+  ];
+
+  $data['views']['lesson_progress'] = [
+    'title' => t("Lesson's progress"),
+    'help' => t("Show lesson progress."),
+    'field' => [
+      'id' => 'lesson_progress',
+    ],
+  ];
+
+  $data['views']['event_popup_link'] = [
+    'title' => t('Event link'),
+    'help' => t('Event popup link.'),
+    'field' => [
+      'id' => 'event_popup_link',
+    ],
+  ];
+
+  return $data;
+}
+
+function _slp_school_get_chart($labels, $data, $title = 'Chart', $data_title = 'Chart', $chart_type = 'column'): array {
+  if (empty($data)) {
+    return [
+      '#type' => 'markup',
+      '#markup' => t('No results found.'),
+    ];
+  }
+
+  $series = [
+    '#type' => 'chart_data',
+    '#title' => $data_title,
+    '#labels' => array_values($labels),
+    '#data' => array_values($data),
+    '#color' => '#27BEA6',
+  ];
+
+  // Define a y-axis to be used in multiple examples.
+  $yaxis = [
+    '#type' => 'chart_yaxis',
+    '#title' => t('Score', [], ['context' => 'progress']),
+    '#max' => 100,
+  ];
+
+  $build =  [
+    '#type' => 'chart',
+    '#tooltips' => TRUE,
+    '#title' => $title,
+    '#title_font_weight' => 'bold',
+    '#title_font_size' => 20,
+    '#chart_type' => $chart_type,
+    '#chart_library' => 'highcharts',
+    '#legend_position' => 'bottom',
+    '#data_labels' => TRUE,
+    '#height' => 700,
+    '#height_units' => 'px',
+    '#width_units' => '%',
+    '#width' => 100,
+    'series' => $series,
+    'y_axis' => $yaxis,
+    '#raw_options' => [],
+  ];
+
+  return [
+    '#type' => 'markup',
+    '#markup' => Drupal::service('renderer')->render($build),
+  ];
+}
+
+/**
+ * Implements hook_taxonomy_term_insert().
+ */
+function slp_school_taxonomy_term_insert(EntityInterface $entity): void {
+  if ($entity->hasField('field_author')) {
+    $id = Drupal::currentUser()->id();
+    $entity->set('field_author', ['target_id' => $id]);
+    $entity->save();
+  }
+}
+
+/**
+ * Implements hook_entity_operation_alter().
+ */
+function slp_school_entity_operation_alter(array &$operations, \Drupal\Core\Entity\EntityInterface $entity): void {
+  if (isset($operations['edit']['url'])) {
+    $url = $operations['edit']['url'];
+    if ($url->getRouteName() === 'entity.taxonomy_term.edit_form') {
+      $id = Drupal::currentUser()->id();
+      $vocabulary = 'vocabulary_' . $id;
+      if ($id == 1) {
+        $vocabulary = 'vocabulary';
+      }
+      $properties = ['taxonomy_vocabulary' => $vocabulary] + $url->getRouteParameters();
+      $new_url = Url::fromRoute('slp_school.edit_vocabulary', $properties);
+      $operations['edit']['url'] = $new_url;
+      $operations['edit']['attributes'] = [
+        'class' => ['use-ajax'],
+        'data-dialog-type' => 'modal',
+      ];
+    }
+    elseif ($url->getRouteName() === 'entity.node.edit_form') {
+      _get_correct_destination_for_the_tab($url);
+    }
+    elseif ($url->getRouteName() === 'entity.commerce_product.edit_form') {
+      _get_correct_destination_for_the_tab($url);
+    }
+  }
+  if (isset($operations['delete']['url'])) {
+    $url = $operations['delete']['url'];
+    _get_correct_destination_for_the_tab($url);
+  }
+}
+
+/**
+ * Returns correct destination.
+ *
+ * @param $url
+ *  Current url.
+ */
+function _get_correct_destination_for_the_tab(&$url): void {
+  $options = $url->getOptions();
+  if (isset($options['query']['destination'])) {
+    $destination = $options['query']['destination'];
+    $items = explode('/', $destination);
+    $node_url = '';
+    if ($items) {
+      foreach ($items as $item) {
+        if (!str_contains($item, 'paragraph-')) {
+          continue;
+        }
+
+        $pid = str_replace('paragraph-', '', $item);
+        $paragraph = Paragraph::load($pid);
+        $node = $paragraph->getParentEntity();
+        if ($node instanceof NodeInterface) {
+          $node_url = $node->toUrl();
+          $node_url->setOption('fragment', $paragraph->uuid());
+          $node_url = $node_url->toString();
+        }
+        break;
+      }
+    }
+    $options = [];
+    $options['query']['destination'] = $node_url;
+    $url->setOptions($options);
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function slp_school_form_alter(&$form, FormStateInterface $form_state, string $form_id): void {
+  if (
+    str_contains($form_id, 'delete_form') ||
+    str_contains($form_id, 'commerce_product')
+  ) {
+
+    $current_user = Drupal::currentUser();
+    $access = (in_array('administrator', $current_user->getRoles()) || $current_user->id() === 1);
+    if (isset($form['status'])) {
+      $form['status']['#access'] = $access;
+    }
+    if (isset($form['field_image'])) {
+      $form['field_image']['#access'] = $access;
+    }
+    if (isset($form['author'])) {
+      $form['author']['#access'] = $access;
+    }
+    if (isset($form['meta'])) {
+      $form['meta']['#access'] = $access;
+    }
+    if (isset($form['actions']['submit_continue'])) {
+      $form['actions']['submit_continue']['#access'] = $access;
+    }
+    $theme = Drupal::service('theme.manager')->getActiveTheme()->getName();
+    if (isset($form['actions']['submit']) && $theme === 'slp') {
+      $submit = $form['actions']['submit'];
+      $form['actions'] = $submit;
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function slp_school_form_node_form_alter(&$form): void {
+  $form['#after_build'][] = 'slp_school_file_entity_after_build';
+
+  // Show publish checkbox for teachers and authors.
+  if (isset($form['status'])) {
+    $current_user = Drupal::currentUser();
+    $haystack = ['administrator', 'teacher_paid', 'author_paid', 'director_paid'];
+    $access = count(array_intersect($haystack, $current_user->getRoles())) > 0 || ($current_user->id() === 1);
+    $form['status']['#access'] = $access;
+  }
+}
+
+/**
+ * After Build function to alter the file entity form.
+ */
+function slp_school_file_entity_after_build($element): array {
+  if (isset($element['field_audio_answer']['widget'][0]['inline_entity_form']['field_media_audio_file']['widget'][0]['remove_button'])) {
+    $element['field_audio_answer']['widget'][0]['inline_entity_form']['field_media_audio_file']['widget'][0]['remove_button']['#access'] = FALSE;
+  }
+
+  return $element;
+}
+
+/**
+ * Implements hook_taxonomy_term_access().
+ */
+function slp_school_taxonomy_term_access(TermInterface $term, $operation, AccountInterface $account): AccessResult {
+  if ($operation === 'update'|| $operation === 'delete') {
+    $vid = $term->get('vid')->target_id;
+    $id = $account->id();
+    $vocabulary = 'vocabulary_' . $id;
+    if ($id == 1) {
+      $vocabulary = 'vocabulary';
+    }
+    if ($vid === $vocabulary) {
+      return AccessResult::allowed()->cachePerPermissions();
+    }
+  }
+
+  return AccessResult::neutral()->cachePerPermissions();
+}
+
+/**
+ * Alter forms for field widgets provided by other modules.
+ *
+ * This hook can only modify individual elements within a field widget and
+ * cannot alter the top level (parent element) for multi-value fields. In most
+ * cases, you should use hook_field_widget_complete_form_alter() instead and
+ * loop over the elements.
+ *
+ * @param array $element
+ *   The field widget form element as constructed by
+ *   \Drupal\Core\Field\WidgetBaseInterface::form().
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ *   The current state of the form.
+ * @param array $context
+ *   An associative array containing the following key-value pairs:
+ *   - form: The form structure to which widgets are being attached. This may be
+ *     a full form structure, or a sub-element of a larger form.
+ *   - widget: The widget plugin instance.
+ *   - items: The field values, as a
+ *     \Drupal\Core\Field\FieldItemListInterface object.
+ *   - delta: The order of this item in the array of subelements (0, 1, 2, etc).
+ *   - default: A boolean indicating whether the form is being shown as a dummy
+ *     form to set default values.
+ *
+ * @see \Drupal\Core\Field\WidgetBaseInterface::form()
+ * @see \Drupal\Core\Field\WidgetBase::formSingleElement()
+ * @see hook_field_widget_single_element_WIDGET_TYPE_form_alter()
+ * @see hook_field_widget_complete_form_alter()
+ * @see https://www.drupal.org/node/3180429
+ */
+function slp_school_field_widget_single_element_form_alter(array &$element, \Drupal\Core\Form\FormStateInterface $form_state, array $context) {
+  // Add a css class to widget form elements for all fields of type my_type.
+  $is_admin = Drupal::currentUser()->id() == 1;
+  if ($is_admin) {
+    return;
+  }
+
+  $field_definition = $context['items']->getFieldDefinition();
+  if ($field_definition->getType() == 'webform') {
+    $webforms = [
+      'ready_for_the_call',
+      'otrymayte_bezkoshtovnu_popup',
+    ];
+
+    if (!empty($element['target_id']['#options'])) {
+      foreach ($element['target_id']['#options'] as $key => $option) {
+        if (!in_array($key, $webforms)) {
+          unset($element['target_id']['#options'][$key]);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function slp_school_form_user_form_alter(&$form, FormStateInterface $form_state): void {
+  $form['#validate'][] = 'slp_school_is_duration_int_value';
+  $current_user = Drupal::currentUser();
+  $is_admin = $current_user->id() == 1;
+  if ($current_user->isAuthenticated()) {
+    $form['field_school_role']['#access'] = FALSE;
+    $form['account']['mail']['#access'] = FALSE;
+    $form['field_subscription_type']['#access'] = FALSE;
+    $user = $form_state->get('user');
+    if ($is_admin) {
+      $form['account']['mail']['#access'] = TRUE;
+    }
+
+    if ($is_admin || $user->get('field_school_role')->isEmpty()) {
+      $form['field_school_role']['#access'] = TRUE;
+    }
+
+    if ($is_admin || $user->get('field_subscription_type')->isEmpty()) {
+      $form['field_subscription_type']['#access'] = TRUE;
+    }
+
+    return;
+  }
+  else {
+    // Show this select list for new users only.
+    $user = $form_state->get('user');
+    if ($user) {
+      $due_date = $user->get('field_due_date')->value;
+      if ($due_date) {
+        $form['field_school_role']['#access'] = FALSE;
+        return;
+      }
+    }
+  }
+
+  $form['actions']['submit']['#submit'][] = '_slp_school_set_user_role';
+}
+
+
+/**
+ * Validate if duration is numeric.
+ *
+ * @param $form
+ *   Form array.
+ * @param FormStateInterface $form_state
+ *   Form state array.
+ */
+function slp_school_is_duration_int_value(&$form, FormStateInterface $form_state): void {
+  $durations = $form_state->getValue('field_lessons_duration');
+  if (isset($durations['target_id'])) {
+    foreach ($durations['target_id'] as $duration) {
+      if (!isset($duration['entity'])) {
+        continue;
+      }
+
+      if (!is_numeric($duration['entity']->getName())) {
+        $message = t("Lesson's duration should be numeric.");
+        $form_state->setError($form['field_lessons_duration'], $message);
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function slp_school_form_user_register_form_alter(&$form): void {
+  _slp_school_add_school($form);
+  $type = \Drupal::request()->query->get('subscription-type');
+  if ($type) {
+    if ($type === 'school') {
+      $type = 'director';
+    }
+    $form['field_school_role']['widget']['#default_value'] = $type;
+  }
+
+  $plan = \Drupal::request()->query->get('subscription-plan');
+  if ($plan) {
+    $form['field_subscription_type']['widget']['#default_value'] = $plan;
+  }
+}
+
+/**
+ * Adds school name to the form.
+ */
+function _slp_school_add_school(&$form): void {
+  $form['school_name'] = [
+    '#type' => 'textfield',
+    '#title' => t('School name'),
+    '#weight' => -1,
+    '#states' => [
+      'visible' => [
+        'select[name="field_school_role"]' => ['value' => 'director'],
+      ],
+      'required' => [
+        'select[name="field_school_role"]' => ['value' => 'director'],
+      ],
+    ],
+  ];
+}
+
+/**
+ * Adds sign up event to the collector.
+ */
+function _slp_school_set_user_role(&$form, FormStateInterface $form_state): void {
+  $user = $form_state->getBuildInfo()['callback_object']?->getEntity();
+  $role = $form_state->getValue('field_school_role');
+  $plan = $form_state->getValue('field_subscription_type');
+  if ($user && $role) {
+    $school_name = $form_state->getValue('school_name') ?? NULL;
+    Drupal::service('slp_school.school_manager')->giveTeacherAccess($user->id(), $role[0]['value'] . ';' . $plan[0]['value'], $school_name);
+  }
+}
+
+/**
+ * Implements hook_views_query_alter().
+ */
+function slp_school_views_query_alter(ViewExecutable $view, QueryPluginBase $query): void {
+  $items = [];
+  $field = '';
+  $create_statistic = FALSE;
+  if ($view->id() === 'my_groups' && $view->current_display === 'block_1') {
+    $items = Drupal::service('slp_school.school_manager')->getSlpGroups();
+    $field = 'slp_group.id';
+  }
+
+  if ($view->id() === 'my_teachers' && $view->current_display === 'block_1') {
+    $items = Drupal::service('slp_school.school_manager')->getActiveTeachers();
+    $field = 'users_field_data.uid';
+  }
+
+  if ($view->id() === 'rating' && $view->current_display === 'teachers_rating') {
+    $items = Drupal::service('slp_school.school_manager')->getActiveTeachers();
+    $field = 'slp_statistic.uid';
+    $create_statistic = TRUE;
+  }
+
+  if ($view->id() === 'reports' && $view->current_display === 'teachers_rating') {
+    $items = Drupal::service('slp_school.school_manager')->getActiveTeachers();
+    $field = 'slp_statistic.uid';
+    $create_statistic = TRUE;
+  }
+
+  if ($view->id() === 'my_students' && $view->current_display === 'block_1') {
+    $items = Drupal::service('slp_school.school_manager')->getActiveStudents();
+    $field = 'users_field_data.uid';
+  }
+
+  if ($view->id() === 'rating' && $view->current_display === 'students_rating') {
+    $items = Drupal::service('slp_school.school_manager')->getActiveStudents();
+    $field = 'slp_statistic.uid';
+    $create_statistic = TRUE;
+  }
+
+  if ($view->id() === 'reports' && $view->current_display === 'students_rating') {
+    $items = Drupal::service('slp_school.school_manager')->getActiveStudents();
+    $field = 'slp_statistic.uid';
+    $create_statistic = TRUE;
+  }
+
+  if ($view->id() === 'teacher_content' && $view->current_display === 'block_1') {
+    $items = Drupal::service('slp_school.school_manager')->getLessons();
+    $field = 'node_field_data.nid';
+  }
+
+  if ($view->id() === 'author' && $view->current_display === 'block_1') {
+    $items = Drupal::service('slp_school.school_manager')->getCourses();
+    $field = 'commerce_product_field_data.product_id';
+  }
+
+  if ($view->id() === 'events' && $view->current_display === 'block_1') {
+    $items = Drupal::service('slp_school.school_manager')->getEvents();
+    $field = 'node_field_data.nid';
+  }
+
+  if ($items && $field) {
+    if ($create_statistic) {
+      $uid = Drupal::currentUser()->id();
+      Drupal::service('slp_statistic.manager')->createUserReferencesStatistic($uid);
+    }
+
+
+    foreach ($query->where as &$condition_group) {
+      foreach ($condition_group['conditions'] as &$condition) {
+        if (!isset($condition['field'])) {
+          continue;
+        }
+        if (str_contains($condition['field'], 'slp_statistic.created')) {
+          $diff = time() - strtotime('today');
+          $condition['field'] = 'slp_statistic.created >= ***CURRENT_TIME***-' . $diff;
+        }
+
+        if ($condition['operator'] !== '=') {
+          continue;
+        }
+
+        if (str_contains($condition['field'], $field)) {
+          $condition['value'] = $items;
+          $condition['operator'] = 'IN';
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Paragraph node__lesson__teaser.
+ */
+function slp_school_preprocess_node__lesson__full(array &$variables): void {
+  $id = Drupal::currentUser()->id();
+  $query = \Drupal::database()->select('node_field_data', 'nfd');
+  $query->condition('nfd.type', 'event');
+  $node = \Drupal::routeMatch()->getParameter('node');
+  if ($node instanceof Node) {
+    $query->join('node__field_lesson', 'nfl', 'nfl.entity_id = nfd.nid');
+    $query->condition('nfl.field_lesson_target_id', $node->id());
+  }
+  $query->join('node__field_start_date', 'nfsd', 'nfsd.entity_id = nfd.nid');
+  $query->join('node__field_end_date', 'nfed', 'nfed.entity_id = nfd.nid');
+  $query->where('(UNIX_TIMESTAMP(nfsd.field_start_date_value) - 14400) < UNIX_TIMESTAMP()');
+  $query->where('(UNIX_TIMESTAMP(nfed.field_end_date_value) - 14400) > UNIX_TIMESTAMP()');
+  $query->join('node__field_teacher', 'nft', 'nft.entity_id = nfd.nid');
+  $query->join('node__field_students', 'nfs', 'nfs.entity_id = nfd.nid');
+  $query->where('nft.field_teacher_target_id = :uid or nfs.field_students_target_id = :uid', [':uid' => $id]);
+  $query->addField('nfd', 'nid');
+
+  $events = $query->execute()->fetchCol();
+  if ($events) {
+    $event = reset($events);
+    $event = Node::load($event);
+    if (!$event) {
+      return;
+    }
+
+    $load_user_id = $event->get('field_teacher')->target_id;
+    if ($load_user_id == $id) {
+      $library = 'slp_school/zoom-sdk-js-library-host';
+      $client = \Drupal::service('zoomapi.client');
+      $token = $client->get('users/me/token?type=zak');
+    }
+    else {
+      $library = 'slp_school/zoom-sdk-js-library';
+    }
+
+    $config = \Drupal::configFactory()->getEditable('zoom_video.settings');
+    $meeting_number = $event->get('field_zoom_link')->meeting_number;
+    $meeting_password = $event->get('field_zoom_link')->password;
+
+    $variables['meeting_url'] = [
+      '#theme' => 'zoom_video_formatter_template',
+      '#meetingNumber' => $meeting_number,
+      '#meetingPassword' => $meeting_password,
+      '#attached' => [
+        'library' => [$library, 'slp_school/open_zoom_call'],
+      ],
+    ];
+
+    // Attach the zoom_video settings to drupalSettings.
+    $variables['#attached']['drupalSettings']['zoom_video'] = [
+      'sdk_key' => $config->get('sdk_key'),
+      // @todo We need to improve related JS code to handle multiple values.
+      'meetingNumber' => $meeting_number ?? '',
+      'password' => $meeting_password ?? '',
+    ];
+
+    // Attach the current user settings to drupalSettings.
+    $variables['#attached']['drupalSettings']['user'] = [
+      'userName' => Drupal::currentUser()->getAccountName(),
+      'userEmail' => Drupal::currentUser()->getEmail(),
+      'userToken' => $token['token'] ?? '',
+    ];
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_update().
+ *
+ * This example creates a webinar instance
+ * when a webinar node is saved in Drupal.
+ */
+function slp_school_node_presave(EntityInterface $entity): void {
+  if ($entity->getType() != 'event') {
+    return;
+  }
+
+  $timezone = \Drupal::config('system.date')->get('timezone.default');
+  $lesson = $entity->get('field_lesson')->entity;
+  $host = $entity->get('field_teacher')->entity;
+  $start_date = $entity->get('field_start_date')->value;
+  $end_date = $entity->get('field_end_date')->value;
+  $duration = (strtotime($end_date) - strtotime($start_date)) / 60;
+  $students = $entity->get('field_students')->getValue();
+  $names = [];
+  foreach ($students as $student) {
+    $student_load = User::load($student['target_id']);
+    if (!$student_load) {
+      continue;
+    }
+    $names[] = $student_load->getDisplayName();
+  }
+  $agenda = $lesson->getTitle() . ' ' . t('with') . ' ' . implode(', ', $names);
+  $event_data = [
+    'topic' => $lesson->getTitle(),
+    'type' => 2,
+    'start_time' => $start_date,
+    'duration' => $duration,
+    'timezone' => Drupal::currentUser()->getTimeZone() ?: $timezone,
+    'agenda' => $agenda,
+    'recurrence' => [
+      'type' => 1,
+      'repeat_interval' => 1
+    ],
+    'settings' => [
+      'host_video' => 'true',
+      'participant_video' => 'true',
+      'join_before_host' => 'False',
+      'mute_upon_entry' => 'False',
+      'watermark' => 'true',
+      'audio' => 'voip',
+      'auto_recording' => 'cloud'
+    ]
+  ];
+
+  $client = \Drupal::service('zoomapi.client');
+  try {
+    $host_id = $host->get('field_zoom_id')->value;
+    if (!$host_id) {
+      $host_id = $host->getEmail();
+    }
+    // Make the POST request to the zoom api.
+    $zoom_request = $client->post(
+      'users/' . $host_id . '/meetings',
+      ['json' => $event_data]
+    );
+
+    // Save the zoom data back to the event node.
+    if (isset($zoom_request['join_url'])) {
+      $value = ['meeting_url' => $zoom_request['join_url']];
+      preg_match('/\/j\/(\d+)\?pwd=([a-zA-Z0-9]+)/', $value['meeting_url'], $matches);
+      $value['meeting_number'] = $matches[1];
+      $value['password'] = $matches[2];
+      $entity->set('field_zoom_link', $value);
+    }
+    $entity->set('title', $lesson->getTitle());
+    \Drupal::messenger()->addStatus(t('This event was successfully created in Zoom.'));
+  }
+  catch (RequestException $exception) {
+    // Zoom api already logs errors, but you could log more.
+    \Drupal::messenger()->addWarning(t('This event could not be created in Zoom.'));
+  }
+
+}
+
+/**
+ * Remove step param for time for client side validation.
+ */
+function slp_school_after_build($form, &$form_state) {
+  unset($form['start_date']['time']['#attributes']['step']);
+
+  return $form;
+}

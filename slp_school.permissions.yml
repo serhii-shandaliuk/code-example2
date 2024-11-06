@@ -1,0 +1,76 @@
+access add students:
+  title: 'Access add students form'
+  description: 'Access add students form.'
+
+access add teachers:
+  title: 'Access add teachers form'
+  description: 'Access add teachers form.'
+
+access add courses:
+  title: 'Access add courses form'
+  description: 'Access add courses form.'
+
+access add lessons:
+  title: 'Access add lessons access for students form'
+  description: 'Access add lessons access for students form'
+
+access add lessons for groups:
+  title: 'Access add lessons access for groups form'
+  description: 'Access add lessons access for groups form'
+
+access add courses for groups:
+  title: 'Access add courses access for groups form'
+  description: 'Access add courses access for groups form'
+
+access add groups:
+  title: 'Access add groups form'
+  description: 'Access add groups form.'
+
+access change roles:
+  title: 'Change user role form'
+  description: 'Change user role form.'
+
+access pay subscriptions:
+  title: 'Pay subscriptions form'
+  description: 'Pay subscriptions form.'
+
+access add events:
+  title: 'Access add events form'
+  description: 'Access add events form.'
+
+access change teacher in groups:
+  title: 'Access access change teacher in groups'
+  description: 'Access change teacher in groups'
+
+access add homeworks:
+  title: 'Access add homework form'
+  description: 'Access add homework form.'
+
+access check homeworks:
+  title: 'Access check homework form'
+  description: 'Access check homework form.'
+
+access add lessons entities:
+  title: 'Access add lessons entities form'
+  description: 'Access add lessons entities form.'
+
+access add words:
+  title: 'Access add words form'
+  description: 'Access add words form.'
+
+access add entity courses:
+  title: 'Access add entity courses form'
+  description: 'Access add entity courses form'
+
+access view homework:
+  title: 'Access view homework'
+  description: 'Access view homework'
+
+administer slp_school types:
+  title: 'Administer slp school types'
+  description: 'Maintain the types of slp school entity.'
+  restrict access: true
+
+administer slp_group:
+  title: 'Administer slp groups'
+  restrict access: true

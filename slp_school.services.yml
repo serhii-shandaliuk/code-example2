@@ -1,0 +1,14 @@
+services:
+  slp_school.user_page.subscriber:
+    class: Drupal\slp_school\EventSubscriber\RedirectOnUserSubscriber
+    tags:
+      - { name: event_subscriber }
+    arguments: ['@current_user', '@current_route_match', '@entity_type.manager', '@state', '@language_manager']
+  slp_school.ajax_subscriber:
+    class: Drupal\slp_school\EventSubscriber\AjaxResponseSubscriber
+    tags:
+      - { name: event_subscriber }
+    arguments: [ '@theme.manager' ]
+  slp_school.school_manager:
+    class: Drupal\slp_school\SchoolManager
+    arguments: ['@entity_type.manager', '@messenger', '@logger.factory', '@config_entity_cloner.cloner', '@config.factory', '@state', '@current_user', '@zoomapi.client']

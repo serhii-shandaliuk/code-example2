@@ -1,0 +1,13 @@
+{{ attach_library('slp/notification') }}
+{{ attach_library('slp/messages') }}
+{{ attach_library('slp/payment') }}
+<div class="slp-payment paragraph--type--message {{ class }}">
+  <div class="close-messages"></div>
+  <h4 class="block-title"> {{ 'Please read the instructions!'|t }}</h4>
+  <div class="block-content">
+    <div>{{ text }}</div>
+    <div class="slp-payment-contact">
+      {{ payment_link }}
+    </div>
+  </div>
+</div>

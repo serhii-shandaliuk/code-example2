@@ -1,0 +1,10 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - slp_school
+id: slp_school_delete_action
+label: 'Delete slp schools'
+type: slp_school
+plugin: entity:delete_action:slp_school
+configuration: {  }

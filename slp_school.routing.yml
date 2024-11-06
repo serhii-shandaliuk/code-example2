@@ -1,0 +1,338 @@
+slp_school.add_student:
+  path: '/slp-add-student'
+  defaults:
+    _title: 'Add student'
+    _form: '\Drupal\slp_school\Form\constructor\AddStudentForm'
+  requirements:
+    _permission: 'access add students'
+
+slp_school.add_teacher:
+  path: '/slp-add-teacher'
+  defaults:
+    _title: 'Add teacher or author'
+    _form: '\Drupal\slp_school\Form\constructor\AddTeacherForm'
+  requirements:
+    _permission: 'access add teachers'
+
+slp_school.add_course:
+  path: '/slp-add-course'
+  defaults:
+    _title: 'Manage courses access for selected students'
+    _form: '\Drupal\slp_school\Form\constructor\AddCourseAccessForm'
+  requirements:
+    _permission: 'access add courses'
+
+slp_school.add_course_access_for_group:
+  path: '/slp-add-course-access-for-group'
+  defaults:
+    _title: 'Manage courses access for selected groups'
+    _form: '\Drupal\slp_school\Form\constructor\AddCourseAccessForGroupForm'
+  requirements:
+    _permission: 'access add courses for groups'
+
+slp_school.add_lesson:
+  path: '/slp-add-lesson'
+  defaults:
+    _title: 'Manage lessons access for selected students'
+    _form: '\Drupal\slp_school\Form\lessons\AddLessonAccessForm'
+  requirements:
+    _permission: 'access add lessons'
+
+slp_school.add_lesson_access_for_group:
+  path: '/slp-add-lesson-access-for-group'
+  defaults:
+    _title: 'Manage lessons access for selected groups'
+    _form: '\Drupal\slp_school\Form\lessons\AddLessonAccessForGroupForm'
+  requirements:
+    _permission: 'access add lessons for groups'
+
+slp_school.add_group:
+  path: '/slp-add-group'
+  defaults:
+    _title: 'Add group'
+    _form: '\Drupal\slp_school\Form\groups\AddGroupForm'
+  requirements:
+    _permission: 'access add groups'
+
+slp_school.edit_group:
+  path: '/slp-edit-group/{group}'
+  defaults:
+    _title: 'Edit group'
+    _form: '\Drupal\slp_school\Form\groups\AddGroupForm'
+  requirements:
+    _permission: 'access add groups'
+  options:
+    parameters:
+      group:
+        type: 'entity:slp_group'
+
+slp_school.add_event:
+  path: '/slp-add-event'
+  defaults:
+    _title: 'Add event'
+    _form: '\Drupal\slp_school\Form\events\AddEventForm'
+  requirements:
+    _permission: 'access add events'
+
+slp_school.edit_event:
+  path: '/slp-edit-event/{event}'
+  defaults:
+    _title: 'Edit event'
+    _form: '\Drupal\slp_school\Form\events\AddEventForm'
+  requirements:
+    _custom_access: '\Drupal\slp_school\Controller\AccessController::accessEditEvent'
+  options:
+    parameters:
+      event:
+        type: 'entity:node'
+
+slp_school.add_student_to_group:
+  path: '/slp-add-student-to-group/{user}'
+  defaults:
+    _title: 'Add student to a group'
+    _form: '\Drupal\slp_school\Form\groups\AddStudentToGroupForm'
+  requirements:
+    _permission: 'access add groups'
+  options:
+    parameters:
+      user:
+        type: 'entity:user'
+
+slp_school.change_user_role:
+  path: '/slp-change-user-role/{user}'
+  defaults:
+    _title: 'Change user role'
+    _form: '\Drupal\slp_school\Form\constructor\ChangeUserRole'
+  requirements:
+    _permission: 'access change roles'
+  options:
+    parameters:
+      user:
+        type: 'entity:user'
+
+slp_school.pay_subscription:
+  path: '/slp-pay-subscription'
+  defaults:
+    _title: 'Pay subscription'
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::paymentPopup'
+  requirements:
+    _permission: 'access pay subscriptions'
+  options:
+    parameters:
+      user:
+        type: 'entity:user'
+
+slp_school.add_homework:
+  path: '/slp-add-homework/{node}/{paragraph}'
+  defaults:
+    _title: 'Add homework for selected students'
+    _form: '\Drupal\slp_school\Form\lessons\AddHomeworkForm'
+  requirements:
+    _permission: 'access add homeworks'
+  options:
+    parameters:
+      node:
+        type: 'entity:node'
+      paragraph:
+        type: 'entity:paragraph'
+
+slp_school.check_homework:
+  path: '/slp-check-homework/{node}'
+  defaults:
+    _title_callback: '\Drupal\slp_school\Form\lessons\CheckHomeworkForm::getTitle'
+    _form: '\Drupal\slp_school\Form\lessons\CheckHomeworkForm'
+  requirements:
+    _permission: 'access check homeworks'
+  options:
+    parameters:
+      node:
+        type: 'entity:node'
+
+slp_school.add_vocabulary:
+  path: '/slp-add-vocabulary/{taxonomy_vocabulary}'
+  defaults:
+    _title: 'Add word to your vocabulary'
+    _form: '\Drupal\slp_school\Form\lessons\AddWordForm'
+  requirements:
+    _permission: 'access add words'
+
+slp_school.edit_vocabulary:
+  path: '/slp-add-vocabulary/{taxonomy_vocabulary}/{taxonomy_term}'
+  defaults:
+    _title: 'Add word to your vocabulary'
+    _form: '\Drupal\slp_school\Form\lessons\AddWordForm'
+  requirements:
+    _permission: 'access add words'
+  options:
+    parameters:
+      taxonomy_term:
+        type: 'entity:taxonomy_term'
+
+slp_school.autocomplete:
+  path: "/slp_school/{target_type}/{selection_handler}/{selection_settings_key}"
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpAutocompleteDeluxeController::handleAutocomplete'
+  requirements:
+    _permission: "access content"
+
+slp_school.autocomplete_users:
+  path: "/slp-school-users/{target_type}/{selection_handler}/{selection_settings_key}/{node}"
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpAutocompleteDeluxeController::handleAutocomplete'
+  requirements:
+    _permission: "access content"
+
+slp_school.autocomplete_teachers:
+  path: "/slp-school-teachers/{target_type}/{selection_handler}/{selection_settings_key}/{is_teacher}"
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpAutocompleteDeluxeController::handleAutocomplete'
+  requirements:
+    _permission: "access content"
+
+slp_school.user_vocabulary:
+  path: '/user-vocabulary/{user}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::userPopup'
+    _title: 'User Vocabulary'
+  requirements:
+    _permission: 'access add students'
+  options:
+    parameters:
+      user:
+        type: 'entity:user'
+
+slp_school.user_lessons:
+  path: '/user-lessons/{user}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::lessonsPopup'
+    _title: 'User lessons'
+  requirements:
+    _permission: 'access add students'
+  options:
+    parameters:
+      user:
+        type: 'entity:user'
+
+slp_school.event_popup:
+  path: '/event-popup/{event}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::eventPopup'
+    _title_callback: '\Drupal\slp_school\Controller\SlpSchoolPopups::getEventPopupTitle'
+  requirements:
+    _permission: 'access content'
+  options:
+    parameters:
+      event:
+        type: 'entity:node'
+
+slp_school.user_delete_student:
+  path: '/user-delete-student/{user}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::deleteStudent'
+    _title: 'User lessons'
+  requirements:
+    _permission: 'access add students'
+  options:
+    parameters:
+      user:
+        type: 'entity:user'
+
+slp_school.user_delete_teacher:
+  path: '/user-delete-teacher/{user}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::deleteTeacher'
+    _title: 'User lessons'
+  requirements:
+    _permission: 'access add teachers'
+  options:
+    parameters:
+      user:
+        type: 'entity:user'
+
+slp_school.user_delete_student_popup:
+  path: '/user-delete-student-popup/{user}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::deletePopup'
+    _title: 'Delete student'
+  requirements:
+    _permission: 'access add students'
+  options:
+    parameters:
+      user:
+        type: 'entity:user'
+
+slp_school.user_delete_teacher_popup:
+  path: '/user-delete-teacher-popup/{user}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::deleteTeacherPopup'
+    _title: 'Delete teacher'
+  requirements:
+    _permission: 'access add teachers'
+  options:
+    parameters:
+      user:
+        type: 'entity:user'
+
+slp_school.user_delete_group:
+  path: '/user-delete-group/{group}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::deleteGroup'
+    _title: 'Group delete'
+  requirements:
+    _permission: 'access add groups'
+  options:
+    parameters:
+      group:
+        type: 'entity:slp_group'
+
+slp_school.user_delete_group_popup:
+  path: '/user-delete-group-popup/{group}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::deleteGroupPopup'
+    _title: 'Delete group'
+  requirements:
+    _permission: 'access add groups'
+  options:
+    parameters:
+      group:
+        type: 'entity:slp_group'
+
+slp_school.node_vocabulary:
+  path: '/node-vocabulary/{node}'
+  defaults:
+    _controller: '\Drupal\slp_school\Controller\SlpSchoolPopups::nodePopup'
+    _title: 'Lesson Vocabulary'
+  requirements:
+    _permission: 'access content'
+  options:
+    parameters:
+      node:
+        type: 'entity:node'
+
+slp_school.access_manager:
+  path: '/admin/system/access-manager'
+  defaults:
+    _form: '\Drupal\slp_school\Form\constructor\SlpSchoolAccessManagerForm'
+    _title: 'School access manager'
+  requirements:
+    _role: 'administrator'
+  options:
+    _admin_route: TRUE
+
+slp_school.clone_product:
+  path: '/admin/system/clone-product'
+  defaults:
+    _form: '\Drupal\slp_school\Form\constructor\SlpSchoolCloneProduct'
+    _title: 'Clone product'
+  requirements:
+    _role: 'administrator'
+  options:
+    _admin_route: TRUE
+
+entity.slp_group.settings:
+  path: 'admin/structure/slp-group'
+  defaults:
+    _form: '\Drupal\slp_school\Form\SLPGroupSettingsForm'
+    _title: 'SLP group'
+  requirements:
+    _permission: 'administer slp_group'

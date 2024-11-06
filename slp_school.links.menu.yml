@@ -1,0 +1,35 @@
+slp_school.access_manager:
+  route_name: slp_school.access_manager
+  parent: system.admin_config_system
+  title: 'School access manager'
+  weight: -10
+
+slp_school.clone_product:
+  route_name: slp_school.clone_product
+  parent: system.admin_config_system
+  title: 'Product clone'
+  weight: -11
+
+entity.slp_school_type.collection:
+  title: 'SLP school types'
+  description: 'Manage and CRUD actions on SLP school type.'
+  parent: system.admin_structure
+  route_name: entity.slp_school_type.collection
+
+entity.slp_school.collection:
+  title: 'SLP schools'
+  description: 'List of slp schools.'
+  route_name: entity.slp_school.collection
+  parent: system.admin_content
+
+entity.slp_group.settings:
+  title: 'SLP group'
+  description: 'Configure a SLP group entity type.'
+  route_name:  entity.slp_group.settings
+  parent: system.admin_structure
+
+entity.slp_group.collection:
+  title: 'SLP groups'
+  description: 'List of slp groups.'
+  route_name: entity.slp_group.collection
+  parent: system.admin_content

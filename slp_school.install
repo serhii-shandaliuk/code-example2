@@ -1,0 +1,80 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the slp_general module.
+ */
+
+/**
+ * Update outdated fields.
+ */
+function slp_school_update_9001(): void {
+  try {
+    $terms = \Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties(['vid' => 'vocabulary']);
+
+    foreach ($terms as $term) {
+      $term->set('field_author', ['target_id' => 1]);
+      $term->save();
+    }
+  } catch (Exception $e) {
+    Drupal::messenger()->addError($e->getMessage());
+    Drupal::logger('slp_general')->error($e->getMessage());
+  }
+
+}
+
+/**
+ * Install modules that contain new services.
+ */
+function slp_school_update_10002(): void {
+  if (!\Drupal::service('module_handler')->moduleExists('config_entity_cloner')) {
+    \Drupal::service('module_installer')->install(['config_entity_cloner']);
+  }
+  drupal_flush_all_caches();
+}
+
+/**
+ * Updates icon from old to new field.
+ */
+function slp_school_update_10003(): void {
+  if (!\Drupal::service('module_handler')->moduleExists('config_entity_cloner')) {
+    \Drupal::service('module_installer')->install(['config_entity_cloner']);
+  }
+  $paragraphs = \Drupal::entityTypeManager()->getStorage('paragraph')->loadByProperties(['type' => 'start_feature']);
+  $terms_storage = \Drupal::entityTypeManager()->getStorage('taxonomy_term');
+  _slp_school_update_icons($paragraphs, $terms_storage);
+  $paragraphs = \Drupal::entityTypeManager()->getStorage('paragraph')->loadByProperties(['type' => 'benefit']);
+  _slp_school_update_icons($paragraphs, $terms_storage);
+}
+
+/**
+ * Updates icon from old to new field.
+ * @param $paragraphs
+ *   Paragraphs array.
+ * @param $terms_storage
+ *   Terms storage.
+ */
+function _slp_school_update_icons($paragraphs, $terms_storage): void {
+  if (!$paragraphs) {
+    return;
+  }
+
+  foreach ($paragraphs as $paragraph) {
+    $icon = $paragraph->get('field_icon_class')->value;
+    if (!$icon) {
+      continue;
+    }
+
+    $icon = str_replace('icon-', '', $icon);
+    $icons = $terms_storage->loadByProperties(['name' => $icon, 'vid' => 'icons']);
+    if ($icons) {
+      $term_icon = reset($icons);
+    } else {
+      $term_icon = $terms_storage->create(['name' => $icon, 'vid' => 'icons']);
+      $term_icon->save();
+    }
+
+    $paragraph->set('field_icon', ['target_id' => $term_icon->id()]);
+    $paragraph->save();
+  }
+}

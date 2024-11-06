@@ -1,0 +1,48 @@
+reload_tab_data:
+  js:
+    js/reload-tab-data.js: {}
+  dependencies:
+    - core/drupal.ajax
+    - core/drupal
+open_zoom_call:
+  js:
+    js/open-zoom-call.js: {}
+  dependencies:
+    - core/drupal.ajax
+    - core/drupal
+
+zoom-sdk-js-library-host:
+  version: 1
+  css:
+    theme:
+      https://source.zoom.us/2.18.2/css/react-select.css: { }
+  js:
+    https://source.zoom.us/2.18.2/lib/vendor/react.min.js: { }
+    https://source.zoom.us/2.18.2/lib/vendor/react-dom.min.js: { }
+    https://source.zoom.us/2.18.2/lib/vendor/redux.min.js: { }
+    https://source.zoom.us/2.18.2/lib/vendor/redux-thunk.min.js: { }
+    https://source.zoom.us/2.18.2/lib/vendor/lodash.min.js: { }
+    https://source.zoom.us/2.18.2/zoom-meeting-embedded-2.18.2.min.js: { }
+    js/component-view-host.js: { }
+  dependencies:
+    - core/jquery
+    - core/once
+    - core/drupalSettings
+
+zoom-sdk-js-library:
+  version: 1
+  css:
+    theme:
+      https://source.zoom.us/2.18.2/css/react-select.css: { }
+  js:
+    https://source.zoom.us/2.18.2/lib/vendor/react.min.js: { }
+    https://source.zoom.us/2.18.2/lib/vendor/react-dom.min.js: { }
+    https://source.zoom.us/2.18.2/lib/vendor/redux.min.js: { }
+    https://source.zoom.us/2.18.2/lib/vendor/redux-thunk.min.js: { }
+    https://source.zoom.us/2.18.2/lib/vendor/lodash.min.js: { }
+    https://source.zoom.us/2.18.2/zoom-meeting-embedded-2.18.2.min.js: { }
+    js/component-view.js: { }
+  dependencies:
+    - core/jquery
+    - core/once
+    - core/drupalSettings

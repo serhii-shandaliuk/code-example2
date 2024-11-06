@@ -1,0 +1,17 @@
+slp_school.type_add:
+  title: 'Add slp school type'
+  route_name: entity.slp_school_type.add_form
+  appears_on:
+    - entity.slp_school_type.collection
+
+slp_school.add_page:
+  title: 'Add slp school'
+  route_name: entity.slp_school.add_page
+  appears_on:
+    - entity.slp_school.collection
+
+slp_group.add_form:
+  title: 'Add slp group'
+  route_name: entity.slp_group.add_form
+  appears_on:
+    - entity.slp_group.collection

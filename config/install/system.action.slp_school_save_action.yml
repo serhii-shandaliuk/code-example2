@@ -1,0 +1,10 @@
+langcode: en
+status: true
+dependencies:
+  module:
+    - slp_school
+id: slp_school_save_action
+label: 'Save slp schools'
+type: slp_school
+plugin: entity:save_action:slp_school
+configuration: {  }
